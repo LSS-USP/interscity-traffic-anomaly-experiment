@@ -7,7 +7,7 @@ import requests
 
 _, filename = argv
 
-if os.environ['INTERSCITY_HOST']:
+if os.environ.get('INTERSCITY_HOST') is not None:
     host = os.environ['INTERSCITY_HOST']
 else:
     host = 'localhost:8000'
