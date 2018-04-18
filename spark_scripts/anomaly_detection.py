@@ -2,36 +2,20 @@
 import os
 import sys
 
-from round_coordinates import load_nodes_from_xml, load_edges_from_xml
+from pyspark.sql.types import *
 from math import sin, cos, sqrt, atan2, radians
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, hour, dayofyear, minute, array, udf, collect_list, explode, mean
 from pyspark.sql.types import *
 from datetime import datetime
+import requests
 
 
-def minute_mod10(minute):
-    return minute % 10
+def getDistance(x1,y1,x2,y2):
+    return sqrt((x2-x1)**2 + (y2-y1)**2)
 
 
-def getDistanceFromLatLonInKm(lat1,lon1,lat2,lon2):
-    R = 6371 # Radius of the earth in km
-    dLat = radians(lat2-lat1)
-    dLon = radians(lon2-lon1)
-    rLat1 = radians(lat1)
-    rLat2 = radians(lat2)
-    a = sin(dLat/2) * sin(dLat/2) + cos(rLat1) * cos(rLat2) * sin(dLon/2) * sin(dLon/2) 
-    c = 2 * atan2(sqrt(a), sqrt(1-a))
-    d = R * c # Distance in km
-    return d
-
-
-def calc_velocity(dist_km, time_start, time_end):
-    vel = dist_km / ((time_end - time_start).seconds/3600.0)
-    return vel
-
-
-def calc(item):
+def velocityFormula(item):
     meas1, meas2 = item
     ts1, lat1, lon1 = meas1
     ts2, lat2, lon2 = meas2
@@ -42,32 +26,19 @@ def calc(item):
         ts1, lat1, lon1 = meas1
         ts2, lat2, lon2 = meas2
         
-    dist = getDistanceFromLatLonInKm(float(lat1), float(lon1), float(lat2), float(lon2))
-    v = calc_velocity(
-            float(dist), datetime.strptime(ts1, '%Y-%m-%dT%H:%M:%SZ'), datetime.strptime(ts2, '%Y-%m-%dT%H:%M:%SZ'))
-    return v
+    distance = getDistance(float(lat1), float(lon1), float(lat2), float(lon2))
+    diff = float(ts2)-float(ts1)
+    if (diff > 0):
+        return distance/diff
+    else:
+        return 0
 
 
-def calculate_velocity(all_values):
-    a1 = all_values
-    a2 = list(all_values)
-    a1.pop()
-    a2.pop(0)
-    a3 = zip(a1, a2)
-    k =  list(map(calc, a3))
-    if len(k) == 0:
-        return float(0)
-    total = 0
-    for u in k:
-        total += u
-    return float(total/len(k))
-
-
-def takeby2(points):
+def takeBy2(points):
     """
     Example:
-    >>> takeby2([1, 2, 3, 4, 5, 6])
-    [(1, 2), (2, 3), (3, 4), (4, 5), (5, 6)]
+    >>> takeBy2([1, 2, 3, 4, 5, 6])
+    [(1,2),(2,3),(3,4),(4,5),(5,6)] 
     """
     a1 = points
     a2 = list(points)
@@ -76,50 +47,76 @@ def takeby2(points):
     return list(zip(a1, a2))
 
 
-def take_edge(item):
+def takeEdge(item):
     _, lat1, lon1 = item[0]
     _, lat2, lon2 = item[1]
     return [[float(lat1), float(lon1)], [float(lat2), float(lon2)]]
 
 
-def value_minus_mean(kmh_list, mean_val):
-    for i, u in enumerate(kmh_list):
-        kmh_list[i] = abs(u - mean_val)
-    return kmh_list
+def valueMinusMean(values, mean_val):
+    # OBS: enumerate does not reset if it is calld multiple times
+    for i, u in enumerate(values):
+        values[i] = abs(u - mean_val)
+    return values
 
 
 def array_mean(values):
     return sum(values)/len(values)
 
 
+def getSchema():
+    return StructType([
+        StructField("uuid", StringType(), False),
+        StructField("capabilities", StructType([
+            StructField("current_location", ArrayType(
+                StructType([
+                    StructField("lat", DoubleType(), False),
+                    StructField("lon", DoubleType(), False),
+                    StructField("date", StringType(), False),
+                    StructField("nodeID", DoubleType(), False),
+                    StructField("tick", StringType(), False)
+                ])
+            ))
+        ]))
+    ])
+
+
 if __name__ == '__main__':
     spark = SparkSession.builder.getOrCreate()
     spark.sparkContext.setLogLevel("ERROR")
 
-    udfEdgesUnified = udf(takeby2, ArrayType(ArrayType(ArrayType(StringType()))))
-    udfCalculateVelocity = udf(calculate_velocity, DoubleType())
-    udfGetEdge = udf(take_edge, ArrayType(ArrayType(DoubleType())))
-    udfValueMinusMean = udf(value_minus_mean, ArrayType(DoubleType()))
-    udfArrayMean = udf(array_mean, DoubleType())
+    udfEdgesUnified = udf(takeBy2, ArrayType(ArrayType(ArrayType(StringType()))))
+    udfCalculateVelocity = udf(velocityFormula, DoubleType())
+    udfGetEdge = udf(takeEdge, ArrayType(ArrayType(DoubleType())))
+    udfValueMinusMean = udf(valueMinusMean, ArrayType(DoubleType()))
+    udfArrayMean = udf(arrayMean, DoubleType())
 
-    df = spark\
-            .read\
-            .format("json")\
-            .load("/tmp/sp_olho_vivo.json", inferSchema=False)\
-            .withColumn("ts", col("timestamp").cast(TimestampType()))\
-            .orderBy("timestamp")\
-            .withColumn("day", dayofyear("ts"))\
-            .withColumn("hour", hour("ts"))\
-            .withColumn("minute", minute("ts"))\
-            .withColumn("edgeWithTimestamp", array(col("timestamp"), col("lat"), col("lon")))\
-            .select("ts", "day", "identifier_code", "edgeWithTimestamp")\
-            .groupBy("day", "identifier_code")\
+    # get data from collector
+    collector_url = "http://localhost:8000/collector"
+    r = requests.post(collector_url + '/resources/data', json={"capabilities": ["current_location"]})
+    resources = r.json()["resources"]
+    rdd = spark.sparkContext.parallelize(resources)
+    df = spark.createDataFrame(resources, getSchema())
+
+    # cleanning the data and calculating mad
+    df2 = df.select("uuid", explode(col("capabilities.current_location")).alias("values"))
+    df3 = df2.withColumn("nodeID", col("values.nodeID").cast(IntegerType()))
+    df4 = df3.withColumn("timestamp", col("values.date").cast(TimestampType()))
+    df5 = df4.select("uuid", "timestamp", "values.date", "nodeID", "values.tick", "values.lat", "values.lon")\
+            .withColumn("edgeWithTimestamp", array(col("tick"), col("lat"), col("lon")))\
+            .select("uuid", "tick", "nodeID", "edgeWithTimestamp", "lat", "lon")\
+            .groupBy("uuid")\
             .agg(collect_list(col("edgeWithTimestamp")).alias("edgeWithTimestamp"))\
-            .withColumn("edges_unified", udfEdgesUnified(col("edgeWithTimestamp")))\
-            .select("day", explode(col("edges_unified")).alias("edge_with_tempo"))\
-            .withColumn("edge", udfGetEdge(col("edge_with_tempo")))\
+            .select("uuid", udfEdgesUnified(col("edgeWithTimestamp")).alias("edges_unified"))\
+            .select(explode(col("edges_unified")).alias("edge_with_tempo"), "uuid")\
             .withColumn("kmh", udfCalculateVelocity(col("edge_with_tempo")))\
-            .groupBy("day").agg(mean("kmh").alias("kmhmean"), collect_list("kmh").alias("kmh_list"))\
+            .withColumn("edge", udfGetEdge(col("edge_with_tempo")))\
+            .select("edge", "kmh", "uuid")\
+            .groupBy("edge")\
+            .agg(mean("kmh").alias("kmhmean"), collect_list("kmh").alias("kmh_list"))\
             .withColumn("valueminusmean", udfValueMinusMean(col("kmh_list"), col("kmhmean")))\
-            .withColumn("mad", udfArrayMean(col("valueminusmean")))
-    df.show()
+            .withColumn("mad", udfArrayMean(col("valueminusmean")))\
+            .select("mad", "edge", "kmhmean")
+
+    df5.show(truncate=False)
+    df5.printSchema()
