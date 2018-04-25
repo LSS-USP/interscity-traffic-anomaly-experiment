@@ -60,7 +60,7 @@ def valueMinusMean(values, mean_val):
     return values
 
 
-def array_mean(values):
+def arrayMean(values):
     return sum(values)/len(values)
 
 
@@ -120,3 +120,4 @@ if __name__ == '__main__':
 
     df5.show(truncate=False)
     df5.printSchema()
+

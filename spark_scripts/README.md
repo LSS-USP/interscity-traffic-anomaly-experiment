@@ -11,6 +11,15 @@ in `requirements` file. Then, with Spark binaries in your $PATH, just use
 $ spark-submit anomaly_detection.py
 ```
 
+## Passing data from Rabbitmq to Kafka
+
+The file 'rabbitmq_to_kafka.py` publishes data posted in RabbitMQ by the
+platform in a Kafka topic to be consumed by Spark.
+Inside this folder, run
+```
+python3.6 rabbitmq_to_kafka.py
+```
+
 ## Running Tests
 
 Inside the `tests` folder, run
