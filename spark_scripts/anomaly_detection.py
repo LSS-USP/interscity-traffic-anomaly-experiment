@@ -5,9 +5,10 @@ import sys
 from pyspark.sql.types import *
 from math import sin, cos, sqrt, atan2, radians
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, hour, dayofyear, minute, array, udf, collect_list, explode, mean
+from pyspark.sql.functions import col, hour, dayofyear, minute, array, udf, collect_list, explode, mean, get_json_object
 from pyspark.sql.types import *
 from datetime import datetime
+from xml.dom import minidom
 import requests
 
 
@@ -61,6 +62,8 @@ def valueMinusMean(values, mean_val):
 
 
 def arrayMean(values):
+    if (len(values) == 0):
+        return 0
     return sum(values)/len(values)
 
 
@@ -81,6 +84,51 @@ def getSchema():
     ])
 
 
+# def loadEdges():
+#     dom = minidom.parse("map_reduced.xml")\
+#             .getElementsByTagName('link')
+#     mylist = []
+#     for u in dom:
+#         mylist.append([
+#             int(u.getAttribute('id')),
+#             int(u.getAttribute('from')),
+#             int(u.getAttribute('to')),
+#             float(u.getAttribute('length'))
+#         ])
+#     return mylist
+#
+# def loadNodes():
+#     dom = minidom.parse("map_reduced.xml")\
+#             .getElementsByTagName('node')
+#     mylist = []
+#     for u in dom:
+#         mylist.append([
+#             int(u.getAttribute('id')),
+#             float(u.getAttribute('x')),
+#             float(u.getAttribute('y')),
+#         ])
+#     return mylist
+#
+#
+# edges = {}
+# for u in loadEdges():
+#     edges[(u[1], u[2])] = {
+#         "id": u[0],
+#         "len": u[3]
+#     }
+
+
+# nodes = {}
+# for u in loadNodes():
+#     nodes[(u[1], u[2])] = u[0]
+
+
+# def getEdgeId(edge):
+#     fromId = nodes[(edge[0][0], edge[0][1])]
+#     toId = nodes[(edge[1][0], edge[1][1])]
+#     return edges[(fromId, toId)]["id"]
+
+
 if __name__ == '__main__':
     spark = SparkSession.builder.getOrCreate()
     spark.sparkContext.setLogLevel("ERROR")
@@ -90,6 +138,7 @@ if __name__ == '__main__':
     udfGetEdge = udf(takeEdge, ArrayType(ArrayType(DoubleType())))
     udfValueMinusMean = udf(valueMinusMean, ArrayType(DoubleType()))
     udfArrayMean = udf(arrayMean, DoubleType())
+    # udfIsAnomaly = udf(compareValues, BooleanType())
 
     # get data from collector
     collector_url = "http://localhost:8000/collector"
@@ -97,6 +146,7 @@ if __name__ == '__main__':
     resources = r.json()["resources"]
     rdd = spark.sparkContext.parallelize(resources)
     df = spark.createDataFrame(resources, getSchema())
+    exit
 
     # cleanning the data and calculating mad
     df2 = df.select("uuid", explode(col("capabilities.current_location")).alias("values"))
@@ -107,17 +157,62 @@ if __name__ == '__main__':
             .select("uuid", "tick", "nodeID", "edgeWithTimestamp", "lat", "lon")\
             .groupBy("uuid")\
             .agg(collect_list(col("edgeWithTimestamp")).alias("edgeWithTimestamp"))\
-            .select("uuid", udfEdgesUnified(col("edgeWithTimestamp")).alias("edges_unified"))\
-            .select(explode(col("edges_unified")).alias("edge_with_tempo"), "uuid")\
-            .withColumn("kmh", udfCalculateVelocity(col("edge_with_tempo")))\
-            .withColumn("edge", udfGetEdge(col("edge_with_tempo")))\
-            .select("edge", "kmh", "uuid")\
-            .groupBy("edge")\
-            .agg(mean("kmh").alias("kmhmean"), collect_list("kmh").alias("kmh_list"))\
-            .withColumn("valueminusmean", udfValueMinusMean(col("kmh_list"), col("kmhmean")))\
-            .withColumn("mad", udfArrayMean(col("valueminusmean")))\
-            .select("mad", "edge", "kmhmean")
+            .select("uuid", udfEdgesUnified(col("edgeWithTimestamp")).alias("edges_unified"))
 
     df5.show(truncate=False)
-    df5.printSchema()
+    exit
 
+    #         .select(explode(col("edges_unified")).alias("edge_with_tempo"), "uuid")\
+    #         .withColumn("kmh", udfCalculateVelocity(col("edge_with_tempo")))\
+    #         .withColumn("edge", udfGetEdge(col("edge_with_tempo")))\
+    #         .select("edge", "kmh", "uuid")\
+    #         .groupBy("edge")\
+    #         .agg(mean("kmh").alias("kmhmean"), collect_list("kmh").alias("kmh_list"))\
+    #         .withColumn("valueminusmean", udfValueMinusMean(col("kmh_list"), col("kmhmean")))\
+    #         .withColumn("mad", udfArrayMean(col("valueminusmean")))\
+    #         .select("mad", "edge", "kmhmean")
+    #
+    # df5.filter("'edge' == ({0}, {1})").select("kmh")
+    # exit
+    #
+    # df5.show(truncate=False)
+    # df5.printSchema()
+    #
+    # df = spark \
+    #         .readStream \
+    #         .format("kafka") \
+    #         .option("kafka.bootstrap.servers", "localhost:9092") \
+    #         .option("subscribe", "data_stream") \
+    #         .load() \
+    #         .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
+    #
+    # attrs = [ "uuid", "lat", "lon", "tick", "nodeID" ]
+    # json_objects = []
+    # for u in attrs:
+    #     json_objects.append(get_json_object(df.value, '$.'+u).alias(u))
+    #
+    # df \
+    #     .select("value")\
+    #     .select(json_objects)\
+    #     .withColumn("merged", array(col("tick"), col("lat"), col("lon")))\
+    #     .groupBy("uuid")\
+    #     .agg(collect_list(col("merged")).alias("edgeWithTimestamp"))\
+    #     .select("uuid", udfEdgesUnified(col("edgeWithTimestamp")).alias("edges_unified"))\
+    #     .select(explode(col("edges_unified")).alias("edge_with_tempo"), "uuid")\
+    #     .withColumn("edge", udfGetEdge(col("edge_with_tempo")))\
+    #     .select("edge", udfCalculateVelocity(col("edge_with_tempo")).alias("kmh"))\
+    #     .withColumn("isAnomaly", udfDetectAnomaly(col("kmh"), col("edge"))) \
+    #     .writeStream \
+    #     .outputMode("complete")\
+    #     .format("console") \
+    #     .trigger(processingTime='2 seconds') \
+    #     .start() \
+    #     .awaitTermination()
+            # .agg(collect_list(col("merged")).alias("edgeWithTimestamp"))\
+            # .select("uuid", udfEdgesUnified(col("edgeWithTimestamp")).alias("edges_unified"))\
+            # .withColumn("kmh", udfCalculateVelocity(col("edge_with_tempo")))\
+            # .withColumn("edge", udfGetEdge(col("edge_with_tempo")))\
+            # .select("edge", "kmh", "uuid")\
+            # .writeStream \
+            # .format("console").start() \
+            # .awaitTermination()
