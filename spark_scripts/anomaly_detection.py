@@ -5,38 +5,22 @@ import sys
 from pyspark.sql.types import *
 from math import sin, cos, sqrt, atan2, radians
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, hour, dayofyear, minute, array, udf, collect_list, explode, mean, get_json_object
+from pyspark.sql.functions import col, hour, dayofyear, minute, array, udf, collect_list, explode, mean, get_json_object, from_json, size
 from pyspark.sql.types import *
 from datetime import datetime
 from xml.dom import minidom
 import requests
+from pyspark.sql.window import Window
+import json
+import builtins
+from pyspark.sql import DataFrameStatFunctions as statFunc
+import numpy as np
+import pyspark.sql.functions as func
 
 
-def getDistance(x1,y1,x2,y2):
-    return sqrt((x2-x1)**2 + (y2-y1)**2)
-
-
-def velocityFormula(item):
-    meas1, meas2 = item
-    ts1, lat1, lon1 = meas1
-    ts2, lat2, lon2 = meas2
-
-    # measure1 must occur first than measure2
-    if (ts1 > ts2):
-        meas2, meas1 = meas1, meas2
-        ts1, lat1, lon1 = meas1
-        ts2, lat2, lon2 = meas2
-        
-    distance = getDistance(float(lat1), float(lon1), float(lat2), float(lon2))
-    diff = float(ts2)-float(ts1)
-    if (diff > 0):
-        x = distance/diff
-        if (x == None):
-            return 0
-        else:
-            return x
-    else:
-        return 0
+MAD_CONSTANT = 1.4826
+spark = SparkSession.builder.getOrCreate()
+spark.sparkContext.setLogLevel("ERROR")
 
 
 def takeBy2(points):
@@ -45,8 +29,14 @@ def takeBy2(points):
     >>> takeBy2([1, 2, 3, 4, 5, 6])
     [(1,2),(2,3),(3,4),(4,5),(5,6)] 
     """
+    if (len(points) == 1):
+        return list(zip(points, points))
+    if (len(points) < 1):
+        return []
+
     a1 = points
     a2 = list(points)
+
     a1.pop()
     a2.pop(0)
     return list(zip(a1, a2))
@@ -63,12 +53,6 @@ def valueMinusMean(values, mean_val):
     for i, u in enumerate(values):
         values[i] = abs(u - mean_val)
     return values
-
-
-def arrayMean(values):
-    if (len(values) == 0):
-        return 0
-    return sum(values)/len(values)
 
 
 def getSchema():
@@ -101,125 +85,156 @@ def loadEdges():
         ])
     return mylist
 
-def loadNodes():
-    dom = minidom.parse("map_reduced.xml")\
-            .getElementsByTagName('node')
-    mylist = []
-    for u in dom:
-        mylist.append([
-            int(u.getAttribute('id')),
-            float(u.getAttribute('x')),
-            float(u.getAttribute('y')),
-        ])
-    return mylist
+
+def median(values_list):
+    med = np.median(values_list)
+    return float(med)
 
 
-edges = {}
-for u in loadEdges():
-    edges[(u[1], u[2])] = {
-        "id": u[0],
-        "len": u[3]
-    }
+def buildKafkaStream(topics):
+    return spark \
+            .readStream \
+            .format("kafka") \
+            .option("kafka.bootstrap.servers", "kafka:9092") \
+            .option("subscribe", topics) \
+            .option("checkpointLocation", "hdfs://hadoop:9000/")\
+            .load() \
+            .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
 
 
-nodes = {}
-for u in loadNodes():
-    nodes[(u[1], u[2])] = u[0]
+def extractJsonFromString(df, attrs):
+    json_objects = []
+    for u in attrs:
+        json_objects.append(get_json_object(df.value, '$.'+u).alias(u))
+    return json_objects
 
 
-def getEdgeId(edge):
-    fromId = nodes[(edge[0][0], edge[0][1])]
-    toId = nodes[(edge[1][0], edge[1][1])]
-    return edges[(fromId, toId)]["id"]
+def debugStream(stream, outputMode="complete"):
+    return stream\
+            .writeStream.format("console")\
+            .trigger(processingTime='10 seconds')\
+            .outputMode(outputMode)\
+            .option("truncate", False)\
+            .start()\
 
 
+def calculatesMad(df, c):
+    return df\
+        .agg(udfMedian(func.collect_list(col(c))).alias("median({0})".format(c)), mean(col(c)), collect_list(col(c)).alias("array({0})".format(c)))\
+        .withColumn(
+            "{0}-median({0})".format(c), udfValueMinusMean(
+                col("array({0})".format(c)), col("median({0})".format(c))
+            )
+        )\
+        .withColumn(
+            "median({0}-median({0}))".format(c),
+            udfMedian(col("{0}-median({0})".format(c)))
+        )\
+        .withColumn("mad", col("median({0}-median({0}))".format(c)) * MAD_CONSTANT)
+
+udfMedian = func.udf(median, FloatType())
+udfValueMinusMean = udf(valueMinusMean, ArrayType(DoubleType()))
 
 if __name__ == '__main__':
-    spark = SparkSession.builder.getOrCreate()
-    spark.sparkContext.setLogLevel("ERROR")
+    edges = {}
+    for u in loadEdges():
+        edges[(u[1], u[2])] = [u[0], u[3]]
+
+    def getEdgeId(edge):
+        fromId = int(edge[0][1])
+        toId = int(edge[1][1])
+        val = edges.get((fromId, toId), None)
+        if (val == None):
+            return -1
+        else:
+            return val[0]
+
+    def getEdgeLength(edge):
+        fromId = int(edge[0][1])
+        toId = int(edge[1][1])
+        return edges[(fromId, toId)][1]
+
+    def getTickDiff(edge):
+        fromTick = int(edge[0][0])
+        toTick = int(edge[1][0])
+        return (toTick - fromTick)
 
     udfEdgesUnified = udf(takeBy2, ArrayType(ArrayType(ArrayType(StringType()))))
-    udfCalculateVelocity = udf(velocityFormula, DoubleType())
     udfGetEdge = udf(takeEdge, ArrayType(ArrayType(DoubleType())))
-    udfValueMinusMean = udf(valueMinusMean, ArrayType(DoubleType()))
-    udfArrayMean = udf(arrayMean, DoubleType())
+    udfGetEdgeId = udf(getEdgeId, IntegerType())
+    udfGetEdgeLength = udf(getEdgeLength, DoubleType())
+    udfGetTickDiff = udf(getTickDiff, IntegerType())
 
     # get data from collector
-    collector_url = "http://localhost:8000/collector"
+    collector_url = "http://data-collector:3000"
     r = requests.post(collector_url + '/resources/data', json={"capabilities": ["current_location"]})
     resources = r.json()["resources"]
     rdd = spark.sparkContext.parallelize(resources)
     df = spark.createDataFrame(resources, getSchema())
 
     # cleanning the data and calculating mad
-    df2 = df.select("uuid", explode(col("capabilities.current_location")).alias("values"))
-    df3 = df2.withColumn("nodeID", col("values.nodeID").cast(IntegerType()))
-    df4 = df3.withColumn("timestamp", col("values.date").cast(TimestampType()))
-    df5 = df4.select("uuid", "timestamp", "values.date", "nodeID", "values.tick", "values.lat", "values.lon")\
-            .withColumn("edgeWithTimestamp", array(col("tick"), col("lat"), col("lon")))\
-            .select("uuid", "tick", "nodeID", "edgeWithTimestamp", "lat", "lon")\
+    clean_data = df\
+            .select("uuid", explode(col("capabilities.current_location")).alias("values"))\
+            .withColumn("nodeID", col("values.nodeID").cast(IntegerType()))\
+            .select("uuid", "values.date", "nodeID", col("values.tick").cast(IntegerType()), "values.lat", "values.lon")\
+            .orderBy("tick", ascending=True)\
+            .withColumn("tick+nodeID", array(col("tick"), col("nodeID")))\
+            .select("uuid", "tick", "nodeID", "tick+nodeID")
+
+    clean_data.show()
+
+    edges_data = clean_data\
             .groupBy("uuid")\
-            .agg(collect_list(col("edgeWithTimestamp")).alias("edgeWithTimestamp"))\
-            .select("uuid", udfEdgesUnified(col("edgeWithTimestamp")).alias("edges_unified"))\
-            .select(explode(col("edges_unified")).alias("edge_with_tempo"), "uuid")\
-            .withColumn("kmh", udfCalculateVelocity(col("edge_with_tempo")))\
-            .withColumn("edge", udfGetEdge(col("edge_with_tempo")))\
-            .select("edge", "kmh", "uuid")\
-            .groupBy("edge")\
-            .agg(mean("kmh").alias("kmhmean"), collect_list("kmh").alias("kmh_list"))\
-            .withColumn("valueminusmean", udfValueMinusMean(col("kmh_list"), col("kmhmean")))\
-            .withColumn("mad", udfArrayMean(col("valueminusmean")))\
-            .select("mad", "edge", "kmhmean")
+            .agg(collect_list(col("tick+nodeID")).alias("array(tick+nodeID)"))\
+            .select("uuid", udfEdgesUnified(col("array(tick+nodeID)")).alias("edges"))\
+            .select(explode(col("edges")).alias("edge"), "uuid")\
+            .withColumn("edgeId", udfGetEdgeId(col("edge")))\
+            .where(col("edgeId") != -1)\
+            .withColumn("length", udfGetEdgeLength(col("edge")))\
+            .withColumn("tickDiff", udfGetTickDiff(col("edge")))\
+            .where(col("tickDiff") > 0)
+
+    edges_data.show(truncate=False)
+
+    grouped_df = edges_data\
+            .withColumn("kmh", col("length") / col("tickDiff"))\
+            .groupBy("edgeId")\
+
+    velocity_data = calculatesMad(grouped_df, "kmh")\
+            .withColumn("upper_threshold", col("median(kmh)") + 3.*col("mad"))\
+            .withColumn("lower_threshold", col("median(kmh)") - 3.*col("mad"))
+
+    velocity_data.select("mad", "upper_threshold", "lower_threshold").show(truncate=False)
+
+    thresholds = {}
+
+    annon = velocity_data.select("upper_threshold", "lower_threshold", "edgeId").rdd.collect()
+    for u in annon:
+        thresholds[u["edgeId"]] = [u["lower_threshold"], u["upper_threshold"]]
 
 
-    def compareValues(kmh, edge):
-        if (kmh == None):
-            kmh = 0
-        mad = 5
-        # mad = df5.filter("'edge' == [[{0}, {1}], [{2}, {3}]]".format(edge[0][0], edge[0][1], edge[1][0], edge[1][1]))\
-        #         .select("kmh").collect()
-        if (kmh > 3*mad):
-            return True
-        else:
-            return False
+    def compareValues(edgeId, kmh):
+        lower, upper = thresholds.get(edgeId)
+        return (kmh > upper) or (kmh < lower)
 
-    udfDetectAnomaly = udf(compareValues, BooleanType())
 
-    df = spark \
-            .readStream \
-            .format("kafka") \
-            .option("kafka.bootstrap.servers", "localhost:9092") \
-            .option("subscribe", "data_stream") \
-            .load() \
-            .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
+    udfIsAnomaly = udf(compareValues, BooleanType())
 
-    attrs = [ "uuid", "lat", "lon", "tick", "nodeID" ]
-    json_objects = []
-    for u in attrs:
-        json_objects.append(get_json_object(df.value, '$.'+u).alias(u))
+    df = buildKafkaStream("data_stream")
 
-    df \
-        .select("value")\
-        .select(json_objects)\
-        .withColumn("merged", array(col("tick"), col("lat"), col("lon")))\
-        .groupBy("uuid")\
-        .agg(collect_list(col("merged")).alias("edgeWithTimestamp"))\
-        .select("uuid", udfEdgesUnified(col("edgeWithTimestamp")).alias("edges_unified"))\
-        .select(explode(col("edges_unified")).alias("edge_with_tempo"), "uuid")\
-        .withColumn("edge", udfGetEdge(col("edge_with_tempo")))\
-        .select("edge", udfCalculateVelocity(col("edge_with_tempo")).alias("kmh"))\
-        .withColumn("isAnomaly", udfDetectAnomaly(col("kmh"), col("edge"))) \
-        .writeStream \
-        .outputMode("complete")\
-        .format("console") \
-        .trigger(processingTime='2 seconds') \
-        .start() \
-        .awaitTermination()
-            # .agg(collect_list(col("merged")).alias("edgeWithTimestamp"))\
-            # .select("uuid", udfEdgesUnified(col("edgeWithTimestamp")).alias("edges_unified"))\
-            # .withColumn("kmh", udfCalculateVelocity(col("edge_with_tempo")))\
-            # .withColumn("edge", udfGetEdge(col("edge_with_tempo")))\
-            # .select("edge", "kmh", "uuid")\
-            # .writeStream \
-            # .format("console").start() \
-            # .awaitTermination()
+    stream = df\
+            .select(extractJsonFromString(df, ["tick", "nodeID", "uuid"]))\
+            .withColumn("merged", array(col("tick"), col("nodeID")))\
+            .groupBy("uuid")\
+            .agg(collect_list(col("merged")).alias("tick+nodeID"))\
+            .select("uuid", udfEdgesUnified(col("tick+nodeID")).alias("edges"))\
+            .select(explode(col("edges")).alias("edge"), "uuid")\
+            .filter(size(col("edge")) >= 2)\
+            .withColumn("edgeId", udfGetEdgeId(col("edge")))\
+            .where(col("edgeId") != -1)\
+            .withColumn("length", udfGetEdgeLength(col("edge")))\
+            .withColumn("tickDiff", udfGetTickDiff(col("edge")))\
+            .withColumn("kmh", col("length") / col("tickDiff"))\
+            .withColumn("is_anomaly", udfIsAnomaly(col("edgeId"), col("kmh")))
+
+    debugStream(stream).awaitTermination()
