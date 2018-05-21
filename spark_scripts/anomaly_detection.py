@@ -1,6 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, from_json, udf, get_json_object, array, collect_list
 from pyspark.sql.types import *
+import json
 
 
 spark = SparkSession.builder.getOrCreate()
@@ -58,7 +59,6 @@ if __name__ == '__main__':
             .select(json_objects)\
             .withColumn("is_anomaly", udfCheckAnomaly(col("edge_id"), col("avg_speed")))
 
-
     anomaly_detection\
             .filter(col("is_anomaly") == True)\
             .select(udfMountValue(col("to"), col("from"), col("edge_id")).alias("value"))\
@@ -69,7 +69,6 @@ if __name__ == '__main__':
             .trigger(processingTime ='0 seconds')\
             .outputMode("append")\
             .start()
-
 
     anomaly_detection\
             .writeStream\

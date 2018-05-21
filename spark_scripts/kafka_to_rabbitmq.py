@@ -51,7 +51,7 @@ for msg in consumer:
     coordinates = utm.to_latlon(easting/10, northing, 19, 'K')
     print("Anomaly coordinates: ", coordinates)
     endpoint = "resources?capability=current_location&lat={0}&lon={1}&radius=500"\
-            .format(coordinates[0], coordinates[1])
+            .format(-23, -46)
 
     try:
         resp = requests.get(host + endpoint)

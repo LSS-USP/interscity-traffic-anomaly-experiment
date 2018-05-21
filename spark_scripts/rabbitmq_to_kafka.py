@@ -11,12 +11,15 @@ channel = connection.channel()
 channel.exchange_declare(exchange='data_stream',
                          exchange_type='topic')
 
+
 result = channel.queue_declare(exclusive=True)
+
 queue_name = result.method.queue
 
 channel.queue_bind(exchange='data_stream',
-                   queue=queue_name,
-                   routing_key='#')
+                    routing_key = '*.current_location.simulated',
+                   queue=queue_name)
+
 
 print(' [*] Waiting for logs. To exit press CTRL+C')
 
@@ -39,6 +42,7 @@ print("Edges loading completed...")
 
 def callback(ch, method, properties, body):
     payload = json.loads(body)
+    print("payload => ", payload)
 
     prev_point = db.get(payload["uuid"])
     if (prev_point != None):
