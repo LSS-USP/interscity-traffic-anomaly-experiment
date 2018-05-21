@@ -1,0 +1,7 @@
+#!/bin/bash
+export PATH="$PATH:/root/bin"
+cp /scripts/bin/detect_anomalies /usr/local/bin/.
+cp /scripts/bin/scenario_setup /usr/local/bin/.
+cp /scripts/bin/train_model /usr/local/bin/.
+/scripts/bin/scenario_setup
+bin/spark-class org.apache.spark.deploy.master.Master -h master
