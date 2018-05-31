@@ -50,14 +50,15 @@ for msg in consumer:
     host = "http://localhost:8000/discovery/"
     coordinates = utm.to_latlon(easting/10, northing, 19, 'K')
     print("Anomaly coordinates: ", coordinates)
-    endpoint = "resources?capability=current_location&lat={0}&lon={1}&radius=500"\
-            .format(-23, -46)
+    endpoint = "resources?capability=traffic_board&lat={0}&lon={1}&radius=500"\
+            .format(coordinates[0], coordinates[1])
 
     try:
         resp = requests.get(host + endpoint)
         resources = json.loads(resp.text)["resources"]
 
         for r in resources:
+            print("Resource %s found!" % r)
             description = r.get("description")
             if (description == None):
                 raise Exception("""
