@@ -1,0 +1,8 @@
+sudo yum -y install https://centos7.iuscommunity.org/ius-release.rpm
+sudo yum install python36u
+sudo yum install python36u-setuptools
+sudo easy_install-3.6 pip
+pip3.6 install kafka --user
+pip3.6 install pika --user
+pip3.6 install utm --user
+pip3.6 install requests --user

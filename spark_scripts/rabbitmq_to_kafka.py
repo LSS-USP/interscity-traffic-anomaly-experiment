@@ -42,16 +42,11 @@ print("Edges loading completed...")
 
 def callback(ch, method, properties, body):
     payload = json.loads(body)
-    print("payload => ", payload)
-
     prev_point = db.get(payload["uuid"])
     if (prev_point != None):
         prev_tick, from_nodeid = prev_point
         new_tick, to_nodeid = (payload["tick"], payload["nodeID"])
         if (new_tick > prev_tick):
-            print("from_nodeid => ", from_nodeid)
-            print("to_nodeid=> ", to_nodeid)
-
             result = edges.get((int(from_nodeid), int(to_nodeid)))
             if (result == None):
                 return
@@ -63,7 +58,7 @@ def callback(ch, method, properties, body):
                 "edge_id": edge_id,
                 "avg_speed": edge_length / (new_tick - prev_tick)
             }
-            print("VELOCITY_DATA =>", velocity_data)
+            print("Posting this data to Kafka: ", velocity_data)
             producer.send('data_stream', json.dumps(velocity_data).encode())
         else:
             print("Wrong tick arrived! WARNING")
