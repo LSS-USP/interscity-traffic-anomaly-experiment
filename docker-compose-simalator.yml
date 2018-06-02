@@ -1,10 +1,9 @@
-version: '2.1'
+version: '3'
 services:
     simulator:
-        image: kanashiro/interscsimulator:test-0.9
+        image: kanashiro/interscsimulator:experiment-0.1
         environment:
-            - RABBITMQ_HOST=192.168.33.254
-            - RABBITMQ_HOST_PORT=5672
+            - RABBITMQ_HOST=127.0.0.1
         network_mode: "host"
         tty: true
         volumes:
