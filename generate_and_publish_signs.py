@@ -30,7 +30,7 @@ def publish_on_platform(node):
     print("[I] Creating traffic board in node {0}".format(node_id))
 
     board_json = { "data": {
-                            "description": "***",
+                            "description": node_id,
                             "capabilities": [ "traffic_board" ],
                             "status": "active",
                             "lat": lat,
