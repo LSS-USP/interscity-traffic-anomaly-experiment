@@ -1,0 +1,73 @@
+#!/bin/bash
+
+init_variables () {
+  export CLOUDSDK_COMPUTE_ZONE=us-east1-b
+  export MACHINE=f1-micro
+  export IMAGE_PROJECT=ubuntu-os-cloud
+  export IMAGE=ubuntu-1804-bionic-v20180522
+}
+
+create_gcloud_instance() {
+  gcloud compute instances create $PLATFORM_ALIAS --machine-type=$MACHINE --preemptible --image=$IMAGE --image-project=$IMAGE_PROJECT
+}
+
+install_dependencies() {
+  gcloud compute ssh $PLATFORM_ALIAS --command=<<- Command
+sudo apt update
+sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+sudo apt install -y docker-ce
+sudo apt install -y docker-compose
+Command
+}
+
+setup_conversion_scripts() {
+  gcloud compute ssh $PLATFORM_ALIAS --command=<<- Command
+# sudo yum -y install https://centos7.iuscommunity.org/ius-release.rpm
+# sudo yum install -y python36u
+# sudo yum install -y python36u-setuptools
+# sudo easy_install-3.6 pip
+# pip3.6 install kafka --user
+# pip3.6 install pika --user
+# pip3.6 install utm --user
+# pip3.6 install requests --user
+Command
+}
+
+setup_docker_images() {
+  gcloud compute ssh $PLATFORM_ALIAS --command=<<- Command
+  mkdir $HOME/experiment
+  cd $HOME/experiment
+  git clone https://gitlab.com/smart-city-software-platform/dev-env.git
+  git clone https://github.com/LSS-USP/interscity-traffic-anomaly-experiment.git
+  cd dev-env
+  git submodule init
+  git submodule update
+  ./project setup
+  ./project start
+  cd ../
+  cd interscity-traffic-anomaly-experiment/spark_scripts
+  sudo docker-compose up -d
+Command
+}
+
+setup_platform_from_scratch() {
+  install_dependencies
+  setup_docker_images
+  setup_conversion_scripts
+}
+
+delete_instances() {
+  gcloud compute instances delete $PLATFORM_ALIAS
+}
+
+if [ "$1" = "setup" ]; then
+  init_variables
+  create_gcloud_instance
+  setup_platform_from_scratch
+fi
+
+if [ "$1" = "destroy-all" ]; then
+  delete_instances
+fi
