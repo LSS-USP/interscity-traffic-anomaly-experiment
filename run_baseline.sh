@@ -23,6 +23,8 @@ EOF
 
 for i in $(seq 1 $ROUNDS)
 do
+	echo "[I] Starting rounf $i..."
+
 	echo "[I] docker-compose.yml content"
 	cat docker-compose.yml
 
