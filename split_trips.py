@@ -20,7 +20,9 @@ output = open(output_name[0] + '-splited.xml', 'w')
 for trip in trips.iter('trip'):
     start = int(trip.attrib['start'])
     if(start >= begin and start <= end):
-        data.append(trip)
+        trip_copy = copy.deepcopy(trip)
+        trip_copy.set('start', str(start - begin))
+        data.append(trip_copy)
 
 content = str(ET.tostring(data))
 output.write(content)
