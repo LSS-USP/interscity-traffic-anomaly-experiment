@@ -1,0 +1,8 @@
+[
+  "tests/anomaly_detection_test.py::testTakeBy2",
+  "tests/anomaly_detection_test.py::testTakeEdge",
+  "tests/anomaly_detection_test.py::testValueMinusMean",
+  "tests/anomaly_detection_test.py::testMedian",
+  "tests/anomaly_detection_test.py::testJsonExtraction",
+  "tests/anomaly_detection_test.py::testMad"
+]

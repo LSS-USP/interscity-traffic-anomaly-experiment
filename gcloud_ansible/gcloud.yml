@@ -7,84 +7,11 @@
   roles:
     - common
 
-- name: Docker setup
-  hosts:
-    - all
-  user: root
-  become: yes
-  roles:
-    - docker
+- name: Platform setup
+	hosts:
+		- platform
+	user: root
+	become: yes
+	roles:
+		- platform
 
-- name: Kong setup
-  hosts:
-    - gateway-machine
-  user: root
-  become: yes
-  roles:
-    - kong
-
-- name: Setup rabbitmq
-  hosts: big-machine-1
-  user: root
-  become: yes
-  roles:
-    - rabbitmq
-
-- name: install postgres
-  hosts: big-machine-1
-  user: root
-  become: yes
-  roles:
-    - postgres
-
-- name: setup resource-adaptor
-  hosts:
-    - big-machine-1
-    - small-machine-2
-  user: root
-  become: yes
-  roles:
-    - resource-adaptor
-
-- name: setup resource-cataloguer
-  hosts:
-    - big-machine-1
-    - small-machine-1
-  user: root
-  become: yes
-  roles:
-    - resource-cataloguer
-
-- name: install mongodb
-  hosts: big-machine-2
-  user: root
-  become: yes
-  roles:
-    - mongodb
-      
-- name: setup data-collector
-  hosts:
-    - big-machine-2
-    - small-machine-2
-  user: root
-  become: yes
-  roles:
-    - data-collector
-
-- name: setup resource-discoverer
-  hosts:
-    - big-machine-2
-    - small-machine-1
-  user: root
-  become: yes
-  roles:
-    - resource-discoverer
-
-- name: setup actuator-controller
-  hosts:
-    - big-machine-2
-    - gateway-machine
-  user: root
-  become: yes
-  roles:
-- actuator-controller

@@ -1,0 +1,6 @@
+{
+  "tests/anomaly_detection_test.py::testArrayMean": true,
+  "tests/anomaly_detection_test.py::testGetDistance": true,
+  "tests/anomaly_detection_test.py::testMad": true,
+  "tests/anomaly_detection_test.py::testVelocityFormula": true
+}

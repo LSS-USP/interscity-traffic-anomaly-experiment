@@ -1,0 +1,12 @@
+- name: Set connection limits
+	sysctl: name={{ item[0] }} value={{ item[1] }} state=present sysctl_file=/etc/sysctl.d/70-limits.conf reload=yes
+	with_together:
+		- [ 'net.core.somaxconn', 'net.core.netdev_max_backlog', 'net.ipv4.tcp_max_syn_backlog']
+		- [ 1024, 2000, 2048]
+
+- name: Setup rabbitmq
+	hosts: big-machine-1
+	user: root
+	become: yes
+	roles:
+		- rabbitmq
