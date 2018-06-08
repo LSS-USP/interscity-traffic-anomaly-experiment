@@ -5,6 +5,7 @@ RABBITMQ_HOST=10.142.0.5
 INPUT_DIR="./interscsimulator_input_baseline"
 OUTPUT_DIR="./interscsimulator_output"
 ROUNDS=1
+PLATFORM_ALIAS=platform
 
 echo "[I] Creating docker-compose file"
 cat > docker-compose.yml << EOF
@@ -35,6 +36,13 @@ do
 	echo "[I] Moving events.xml file to output dir"
 	mkdir -p output
 	mv $OUTPUT_DIR/events.xml ouput/events_round_"$i".xml
+#
+#   echo "[I] Removing data-collector from remote host"
+#   gcloud compute ssh dguedes@$PLATFORM_ALIAS --command=<<- Command
+# cd dev-env/data-collector
+# sudo docker-compose down
+# sudo docker-compose up -d
+# Command
 
 	echo "[I] Running docker-compose down"
 	sudo docker-compose down
