@@ -2,14 +2,14 @@
 
 init_variables () {
   export CLOUDSDK_COMPUTE_ZONE=us-east1-b
-  export MACHINE=n1-standard-8
+  export MACHINE=n1-standard-2
   export SHOCK_MACHINE=f1-micro
   export IMAGE_PROJECT=ubuntu-os-cloud
   export IMAGE=ubuntu-1804-bionic-v20180522
 }
 
 create_gcloud_instance() {
-  gcloud compute instances create $PLATFORM_ALIAS --machine-type=$MACHINE --preemptible --image=$IMAGE --image-project=$IMAGE_PROJECT --boot-disk-size=100
+  gcloud compute instances create $PLATFORM_ALIAS --machine-type=$MACHINE --image=$IMAGE --image-project=$IMAGE_PROJECT --boot-disk-size=100
 }
 
 create_shock_gcloud_instance() {
