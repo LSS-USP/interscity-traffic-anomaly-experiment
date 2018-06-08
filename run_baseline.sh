@@ -1,7 +1,7 @@
 #!/bin/bash
 
-DOCKER_IMAGE="kanashiro/interscsimulator:stable-0.1"
-RABBITMQ_HOST=10.142.0.4
+DOCKER_IMAGE="kanashiro/interscsimulator:1.0"
+RABBITMQ_HOST=10.142.0.5
 INPUT_DIR="./interscsimulator_input_baseline"
 OUTPUT_DIR="./interscsimulator_output"
 ROUNDS=1
