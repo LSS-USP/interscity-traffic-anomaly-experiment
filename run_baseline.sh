@@ -23,7 +23,7 @@ EOF
 
 for i in $(seq 1 $ROUNDS)
 do
-	echo "[I] Starting rounf $i..."
+	echo "[I] Starting round $i at $(date)"
 
 	echo "[I] docker-compose.yml content"
 	cat docker-compose.yml
@@ -34,8 +34,10 @@ do
 
 	echo "[I] Moving events.xml file to output dir"
 	mkdir -p output
-	mv $OUTPUT_DIR/events.xml ouput/events_round_"$1".xml
+	mv $OUTPUT_DIR/events.xml ouput/events_round_"$i".xml
 
 	echo "[I] Running docker-compose down"
 	sudo docker-compose down
+
+	echo "[I] Finishing round $i at $(date)"
 done
