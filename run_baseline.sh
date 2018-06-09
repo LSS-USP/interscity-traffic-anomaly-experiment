@@ -33,10 +33,6 @@ do
 	mkdir -p logs
 	sudo docker-compose up > logs/round_"$i".log
 
-	echo "[I] Moving events.xml file to output dir"
-	mkdir -p output
-	mv $OUTPUT_DIR/events.xml ouput/events_round_"$i".xml
-#
 #   echo "[I] Removing data-collector from remote host"
 #   gcloud compute ssh dguedes@$PLATFORM_ALIAS --command=<<- Command
 # cd dev-env/data-collector
@@ -46,6 +42,10 @@ do
 
 	echo "[I] Running docker-compose down"
 	sudo docker-compose down
+
+	echo "[I] Moving events.xml file to output dir"
+	mkdir -p output
+	mv $OUTPUT_DIR/events.xml output/events_round_"$i".xml
 
 	echo "[I] Finishing round $i at $(date)"
 done
