@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DOCKER_IMAGE="kanashiro/interscsimulator:1.0"
+DOCKER_IMAGE="kanashiro/interscsimulator:1.5"
 RABBITMQ_HOST=10.142.0.5
 INPUT_DIR="./interscsimulator_input_baseline"
 OUTPUT_DIR="./interscsimulator_output"
@@ -24,6 +24,7 @@ EOF
 
 for i in $(seq 1 $ROUNDS)
 do
+	echo "================================================================"
 	echo "[I] Starting round $i at $(date)"
 
 	echo "[I] docker-compose.yml content"
@@ -45,7 +46,8 @@ do
 
 	echo "[I] Moving events.xml file to output dir"
 	mkdir -p output
-	mv $OUTPUT_DIR/events.xml output/events_round_"$i".xml
+	cp $OUTPUT_DIR/events.xml output/events_round_"$i".xml
 
 	echo "[I] Finishing round $i at $(date)"
+	echo "================================================================"
 done
