@@ -38,12 +38,6 @@ def takeBy2(points):
     return list(zip(a1, a2))
 
 
-def takeEdge(item):
-    _, lat1, lon1 = item[0]
-    _, lat2, lon2 = item[1]
-    return [[float(lat1), float(lon1)], [float(lat2), float(lon2)]]
-
-
 def valueMinusMean(values, mean_val):
     # OBS: enumerate does not reset if it is calld multiple times
     for i, u in enumerate(values):
@@ -57,8 +51,6 @@ def getSchema():
         StructField("capabilities", StructType([
             StructField("current_location", ArrayType(
                 StructType([
-                    StructField("lat", DoubleType(), False),
-                    StructField("lon", DoubleType(), False),
                     StructField("date", StringType(), False),
                     StructField("nodeID", DoubleType(), False),
                     StructField("tick", StringType(), False)
@@ -69,7 +61,7 @@ def getSchema():
 
 
 def loadEdges():
-    dom = minidom.parse("/scripts/map_reduced.xml")\
+    dom = minidom.parse("/scripts/map.xml")\
             .getElementsByTagName('link')
     mylist = []
     for u in dom:
@@ -119,34 +111,22 @@ if __name__ == '__main__':
 
     edges = {}
     for u in loadEdges():
-        edges[(u[1], u[2])] = [u[0], u[3]]
-
-
-    def getEdgeId(edge):
-        fromId = int(edge[0][1])
-        toId = int(edge[1][1])
-        val = edges.get((fromId, toId), None)
-        if (val == None):
-            return -1
-        else:
-            return val[0]
+        edges[u[0]] = u[3]
 
 
     def getEdgeLength(edge):
-        fromId = int(edge[0][1])
-        toId = int(edge[1][1])
-        val = edges.get((fromId, toId), None)
-        if (val == None):
-            return -1
-        else:
-            return val[1]
+        return edges.get(int(edge[1][1]), None)
+
+
+    def getEdgeId(edge):
+        return int(edge[1][1])
+
 
     udfEdgesUnified = udf(takeBy2, ArrayType(ArrayType(ArrayType(StringType()))))
-    udfGetEdge = udf(takeEdge, ArrayType(ArrayType(DoubleType())))
     udfValueMinusMean = udf(valueMinusMean, ArrayType(DoubleType()))
-    udfGetEdgeId = udf(getEdgeId, IntegerType())
     udfGetEdgeLength = udf(getEdgeLength, DoubleType())
     udfGetTickDiff = udf(getTickDiff, IntegerType())
+    udfGetEdgeId = udf(getEdgeId, IntegerType())
     udfMedian = func.udf(median, FloatType())
 
 
@@ -160,23 +140,22 @@ if __name__ == '__main__':
         # cleanning the data and calculating mad
         clean_data = df\
                 .select("uuid", explode(col("capabilities.current_location")).alias("values"))\
-                .withColumn("nodeID", col("values.nodeID").cast(IntegerType()))\
-                .select("uuid", "values.date", "nodeID", col("values.tick").cast(IntegerType()), "values.lat", "values.lon")\
+                .withColumn("edgeId", col("values.nodeID").cast(IntegerType()))\
+                .select("uuid", "values.date", "edgeId", col("values.tick").cast(IntegerType()))\
                 .orderBy("tick", ascending=True)\
-                .withColumn("tick+nodeID", array(col("tick"), col("nodeID")))\
-                .select("uuid", "tick", "nodeID", "tick+nodeID")
+                .withColumn("tick+edgeId", array(col("tick"), col("edgeId")))\
+                .select("uuid", "tick", "edgeId", "tick+edgeId")
 
         clean_data.show()
+        print(clean_data.count())
 
         edges_data = clean_data\
                 .groupBy("uuid")\
-                .agg(collect_list(col("tick+nodeID")).alias("array(tick+nodeID)"))\
-                .select("uuid", udfEdgesUnified(col("array(tick+nodeID)")).alias("edges"))\
+                .agg(collect_list(col("tick+edgeId")).alias("array(tick+edgeId)"))\
+                .select("uuid", udfEdgesUnified(col("array(tick+edgeId)")).alias("edges"))\
                 .select(explode(col("edges")).alias("edge"), "uuid")\
                 .withColumn("edgeId", udfGetEdgeId(col("edge")))\
-                .where(col("edgeId") != -1)\
                 .withColumn("length", udfGetEdgeLength(col("edge")))\
-                .where(col("length") != -1)\
                 .withColumn("tickDiff", udfGetTickDiff(col("edge")))\
                 .where(col("tickDiff") > 0)
 
