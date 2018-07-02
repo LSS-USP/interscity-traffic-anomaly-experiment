@@ -56,6 +56,11 @@ Inside this folder, run
 python3.6 rabbitmq_to_kafka.py
 ```
 
+## Kafka healthcheck
+```
+./bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.3.0 /scripts/simple_kafka.py
+```
+
 ## Running Tests
 
 Inside the `tests` folder, run
