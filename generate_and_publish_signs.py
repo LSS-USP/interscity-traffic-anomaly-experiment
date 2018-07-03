@@ -62,6 +62,13 @@ def grant_capability_exist():
     url = "http://localhost:8000/catalog/capabilities"
     requests.post(url, {"name": "traffic_board", "capability_type": "sensor"})
 
+
+def from_xy_to_latlon(x, y):
+    url = "https://epsg.io/trans?data={0},{1}&s_srs=32719&t_srs=4326".format(x, y)
+    coords = requests.get(url).json()[0]
+    return [float(coords["x"]), float(coords["y"])]
+
+
 if __name__ == '__main__':
     if (len(sys.argv) > 1):
         grant_capability_exist()
@@ -72,9 +79,10 @@ if __name__ == '__main__':
         node_id = sys.argv[1]
         x = sys.argv[2]
         y = sys.argv[3]
+        coords = from_xy_to_latlon(x, y)
         # url = "https://epsg.io/trans?data={0},{1}&s_srs=4326&t_srs=32719".format(lat, lon)
         # coords = requests.get(url).json()[0]
-        point = [int(node_id), float(x), float(y)]
+        point = [int(node_id), float(coords[0]), float(coords[1])]
 
         # rounded_coord = closest_point(tree, point, nodes_with_id)
         publish_on_platform(point)
