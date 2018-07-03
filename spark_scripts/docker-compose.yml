@@ -2,7 +2,7 @@ version: '2.0'
 
 services:
   master:
-    image: 'gettyimages/spark'
+    image: 'dylanguedes/commited_spark'
     command: /scripts/bin/initial_setup_master
     hostname: master
     environment:
@@ -31,7 +31,7 @@ services:
 
   worker:
     container_name: 'worker'
-    image: gettyimages/spark
+    image: 'dylanguedes/commited_spark'
     command: /scripts/bin/initial_setup_worker
     hostname: worker
     environment:
@@ -68,7 +68,7 @@ services:
 
   hadoop:
     container_name: "hadoop"
-    image: "sequenceiq/hadoop-docker"
+    image: "dylanguedes/hadoop_model"
     ports:
       - "8020:8020"
       - "50070:50070"

@@ -15,7 +15,7 @@ channel.exchange_declare(exchange='traffic_sign', exchange_type='topic')
 consumer = KafkaConsumer('anomalies')
 
 def loadNodes():
-    dom = minidom.parse("map_reduced.xml")\
+    dom = minidom.parse("map.xml")\
             .getElementsByTagName('node')
     mylist = []
     for u in dom:

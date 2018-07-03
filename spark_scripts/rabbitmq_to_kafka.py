@@ -25,14 +25,11 @@ print(' [*] Waiting for logs. To exit press CTRL+C')
 
 
 def load_edges():
-    dom = minidom.parse("map_reduced.xml")\
+    dom = minidom.parse("map.xml")\
             .getElementsByTagName('link')
     results = {}
     for u in dom:
-        results[(int(u.getAttribute("from")), int(u.getAttribute("to")))] = [
-            int(u.getAttribute('id')),
-            float(u.getAttribute('length'))
-        ]
+        results[int(u.getAttribute('id'))] = float(u.getAttribute('length'))
     return results
 
 
@@ -45,16 +42,14 @@ def callback(ch, method, properties, body):
     prev_point = db.get(payload["uuid"])
     if (prev_point != None):
         prev_tick, from_nodeid = prev_point
-        new_tick, to_nodeid = (payload["tick"], payload["nodeID"])
+        new_tick, edge_id = (payload["tick"], payload["nodeID"])
         if (new_tick > prev_tick):
-            result = edges.get((int(from_nodeid), int(to_nodeid)))
+            edge_length = edges.get(edge_id)
             if (result == None):
+                print("%")
                 return
-            edge_id, edge_length = result
 
             velocity_data = {
-                "to": to_nodeid,
-                "from": from_nodeid,
                 "edge_id": edge_id,
                 "avg_speed": edge_length / (new_tick - prev_tick)
             }
@@ -62,6 +57,8 @@ def callback(ch, method, properties, body):
             producer.send('data_stream', json.dumps(velocity_data).encode())
         else:
             print("Wrong tick arrived! WARNING")
+    else:
+        print("X")
     db[payload["uuid"]] = (payload["tick"], payload["nodeID"])
 
 channel.basic_consume(callback,
