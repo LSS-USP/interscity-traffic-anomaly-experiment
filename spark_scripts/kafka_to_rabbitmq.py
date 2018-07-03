@@ -55,37 +55,36 @@ for msg in consumer:
     print("***Anomaly detected***")
     payload = msg.value
     anomaly = json.loads(payload)
+    print("anomaly => ", anomaly)
 
-    edge_id = anomaly.get("edge_id", None)
+    edge_id = anomaly.get("edgeId", None)
     if (edge_id == None):
         raise Exception("Invalid edgeId!!!")
     edge_id = int(edge_id)
 
-    try:
-        [from_id, to_id] = edges[edge_id]
-        coordinates = nodes[from_id]
-        print("corods => ", coordinates)
-        host = "http://localhost:8000/discovery/"
-        endpoint = "resources?capability=traffic_board&lat={0}&lon={1}&radius=500"\
-                .format(coordinates[0], coordinates[1])
-        resp = requests.get(host + endpoint)
-        resources = json.loads(resp.text)["resources"]
-        print("resources: ", resources)
-    #
-    #     for r in resources:
-    #         print("Resource %s found!" % r)
-    #         description = r.get("description")
-    #         if (description == None):
-    #             raise Exception("""
-    #             Your board resources are incorrect. In their description
-    #             you must have their ids.
-    #             """)
-    #
-    #         board_id = 1 #json.loads(description) TODO: default avlue
-    #         message = "%s.%s.%s" % (board_id, fromNodeId, toNodeId)
-    #         channel.basic_publish(exchange='traffic_sign',
-    #                               routing_key='#',
-    #                               body=message)
+    [from_id, to_id] = edges[edge_id]
+    coordinates = nodes[from_id]
+    print("corods => ", coordinates)
+    host = "http://localhost:8000/discovery/"
+    endpoint = "resources?capability=traffic_board&lat={0}&lon={1}&radius=5500"\
+            .format(coordinates[0], coordinates[1])
+    resp = requests.get(host + endpoint)
+    resources = json.loads(resp.text)["resources"]
+    print("resources: ", resources)
+    for r in resources:
+        print("Resource %s found!" % r)
+        description = r.get("description")
+        if (description == None):
+            raise Exception("""
+            Your board resources are incorrect. In their description
+            you must have their ids.
+            """)
+
+        board_id = 1 #json.loads(description) TODO: default avlue
+        message = "%s.%s.%s" % (board_id, fromNodeId, toNodeId)
+        channel.basic_publish(exchange='traffic_sign',
+                               routing_key='#',
+                               body=message)
 
     #print(" [x] Sent %r" % msg)
     # except:
