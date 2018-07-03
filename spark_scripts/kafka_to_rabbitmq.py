@@ -39,43 +39,43 @@ for msg in consumer:
     payload = msg.value
     anomaly = json.loads(payload)
 
-    fromNodeId = int(anomaly.get("fromId"))
-    toNodeId = int(anomaly.get("toId"))
+    fromNodeId = int(anomaly.get("fromId"), None)
+    toNodeId = int(anomaly.get("toId"), None)
     edgeId = int(anomaly.get("edgeId"))
 
-    easting = float(nodes[fromNodeId][0])
-    northing = float(nodes[fromNodeId][1])
-    print("Easting: %s, Northing: %s => " % (easting, northing))
+    # easting = float(nodes[fromNodeId][0])
+    # northing = float(nodes[fromNodeId][1])
+    # print("Easting: %s, Northing: %s => " % (easting, northing))
+    #
+    # host = "http://localhost:8000/discovery/"
+    # coordinates = utm.to_latlon(easting/10, northing, 19, 'K')
+    # print("Anomaly coordinates: ", coordinates)
+    # endpoint = "resources?capability=traffic_board&lat={0}&lon={1}&radius=500"\
+    #         .format(coordinates[0], coordinates[1])
 
-    host = "http://localhost:8000/discovery/"
-    coordinates = utm.to_latlon(easting/10, northing, 19, 'K')
-    print("Anomaly coordinates: ", coordinates)
-    endpoint = "resources?capability=traffic_board&lat={0}&lon={1}&radius=500"\
-            .format(coordinates[0], coordinates[1])
+    # try:
+    #     resp = requests.get(host + endpoint)
+    #     resources = json.loads(resp.text)["resources"]
+    #
+    #     for r in resources:
+    #         print("Resource %s found!" % r)
+    #         description = r.get("description")
+    #         if (description == None):
+    #             raise Exception("""
+    #             Your board resources are incorrect. In their description
+    #             you must have their ids.
+    #             """)
+    #
+    #         board_id = 1 #json.loads(description) TODO: default avlue
+    #         message = "%s.%s.%s" % (board_id, fromNodeId, toNodeId)
+    #         channel.basic_publish(exchange='traffic_sign',
+    #                               routing_key='#',
+    #                               body=message)
 
-    try:
-        resp = requests.get(host + endpoint)
-        resources = json.loads(resp.text)["resources"]
-
-        for r in resources:
-            print("Resource %s found!" % r)
-            description = r.get("description")
-            if (description == None):
-                raise Exception("""
-                Your board resources are incorrect. In their description
-                you must have their ids.
-                """)
-
-            board_id = 1 #json.loads(description) TODO: default avlue
-            message = "%s.%s.%s" % (board_id, fromNodeId, toNodeId)
-            channel.basic_publish(exchange='traffic_sign',
-                                  routing_key='#',
-                                  body=message)
-
-            print(" [x] Sent %r" % message)
-    except:
-        raise Exception("""
-            Your resource_discovery looks weird.
-            Usage: `$python3 kafka_to_rabbitmq.py {resource_discovery_url}`
-            (default resource_discovery_url: http://localhost:8000/discovery/)
-        """)
+    print(" [x] Sent %r" % msg)
+    # except:
+    #     raise Exception("""
+    #         Your resource_discovery looks weird.
+    #         Usage: `$python3 kafka_to_rabbitmq.py {resource_discovery_url}`
+    #         (default resource_discovery_url: http://localhost:8000/discovery/)
+    #     """)
