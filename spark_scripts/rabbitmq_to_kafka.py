@@ -41,11 +41,12 @@ def callback(ch, method, properties, body):
     payload = json.loads(body)
     prev_point = db.get(payload["uuid"])
     if (prev_point != None):
-        prev_tick, from_nodeid = prev_point
+        prev_tick, prev_edge_id = prev_point
         new_tick, edge_id = (payload["tick"], payload["nodeID"])
         if (new_tick > prev_tick):
-            edge_length = edges.get(edge_id)
-            if (result == None):
+            edge_length = edges.get(edge_id, None)
+
+            if (edge_length == None):
                 print("%")
                 return
 
