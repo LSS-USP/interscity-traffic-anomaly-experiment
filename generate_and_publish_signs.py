@@ -66,7 +66,7 @@ def grant_capability_exist():
 def from_xy_to_latlon(x, y):
     url = "https://epsg.io/trans?data={0},{1}&s_srs=32719&t_srs=4326".format(x, y)
     coords = requests.get(url).json()[0]
-    return [float(coords["x"]), float(coords["y"])]
+    return [float(coords["y"]), float(coords["x"])]
 
 
 if __name__ == '__main__':

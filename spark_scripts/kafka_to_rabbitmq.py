@@ -54,7 +54,7 @@ print("edges loaded...")
 def from_xy_to_latlon(x, y):
     url = "https://epsg.io/trans?data={0},{1}&s_srs=32719&t_srs=4326".format(x, y)
     coords = requests.get(url).json()[0]
-    return [float(coords["x"]), float(coords["y"])]
+    return [float(coords["y"]), float(coords["x"])]
 
 
 def from_latlon_to_xy(lat, lon):
@@ -80,21 +80,20 @@ for msg in consumer:
     
     host = "http://localhost:8000/discovery/"
     endpoint = ("resources?capability=traffic_board&lat={0}&lon={1}&radius=1000"
-            .format(coordinates[0], coordinates[1]))
+            .format(converted_coords[0], converted_coords[1]))
     resp = requests.get(host + endpoint)
     resources = json.loads(resp.text)["resources"]
     print("resources: ", resources)
 
     for r in resources:
-        description = r.get("description")
-        if (description == None):
+        board_id = r.get("description")
+        if (board_id == None):
             raise Exception("""
             Your board resources are incorrect. In their description
             you must have their ids.
             """)
 
-        board_id = 1 #json.loads(description) TODO: default avlue
-        message = "%s.%s.%s" % (board_id, fromNodeId, toNodeId)
+        message = "%s.%s.%s" % (board_id, from_id, to_id)
         channel.basic_publish(exchange='traffic_sign',
                                routing_key='#',
                                body=message)
