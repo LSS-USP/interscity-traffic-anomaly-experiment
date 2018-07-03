@@ -68,6 +68,12 @@ Inside the `tests` folder, run
 python3.6 -m pytest  anomaly_detection_test.py
 ```
 
+## Publishing boards
+```
+python3 generate_and_publish_signs.py 4258014904 2818694.112620861  7206797.441784771
+python3 generate_and_publish_signs.py 1819616337 2819912.724556382  7207521.449929407
+```
+
 ## Contact
 
 We are always in #interscity @freenode (IRC). Also, feel free to mail us at
