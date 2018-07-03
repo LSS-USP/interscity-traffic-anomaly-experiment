@@ -27,36 +27,50 @@ def loadNodes():
     return mylist
 
 
+def load_edges():
+    dom = minidom.parse("map.xml")\
+            .getElementsByTagName('link')
+    results = {}
+    for u in dom:
+        results[int(u.getAttribute('id'))] = [
+            int(u.getAttribute('from')),
+            int(u.getAttribute('to'))
+        ]
+
+    return results
+
+
 print("Loading nodes...")
 nodes = {}
 for u in loadNodes():
     nodes[u[0]] = [u[1], u[2]]
 print("Nodes loaded...")
 
+print("Loading edges...")
+edges = load_edges()
+print("edges loaded...")
+
 
 for msg in consumer:
     print("***Anomaly detected***")
-    print(msg)
     payload = msg.value
     anomaly = json.loads(payload)
 
-    fromNodeId = anomaly.get("fromId")
-    toNodeId = anomaly.get("toId")
-    edgeId = anomaly.get("edgeId")
+    edge_id = anomaly.get("edge_id", None)
+    if (edge_id == None):
+        raise Exception("Invalid edgeId!!!")
+    edge_id = int(edge_id)
 
-    # easting = float(nodes[fromNodeId][0])
-    # northing = float(nodes[fromNodeId][1])
-    # print("Easting: %s, Northing: %s => " % (easting, northing))
-    #
-    # host = "http://localhost:8000/discovery/"
-    # coordinates = utm.to_latlon(easting/10, northing, 19, 'K')
-    # print("Anomaly coordinates: ", coordinates)
-    # endpoint = "resources?capability=traffic_board&lat={0}&lon={1}&radius=500"\
-    #         .format(coordinates[0], coordinates[1])
-
-    # try:
-    #     resp = requests.get(host + endpoint)
-    #     resources = json.loads(resp.text)["resources"]
+    try:
+        [from_id, to_id] = edges[edge_id]
+        coordinates = nodes[from_id]
+        print("corods => ", coordinates)
+        host = "http://localhost:8000/discovery/"
+        endpoint = "resources?capability=traffic_board&lat={0}&lon={1}&radius=500"\
+                .format(coordinates[0], coordinates[1])
+        resp = requests.get(host + endpoint)
+        resources = json.loads(resp.text)["resources"]
+        print("resources: ", resources)
     #
     #     for r in resources:
     #         print("Resource %s found!" % r)
