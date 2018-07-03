@@ -35,6 +35,7 @@ def load_edges():
 
 db = {}
 edges = load_edges()
+print("edges => ", edges)
 print("Edges loading completed...")
 
 def callback(ch, method, properties, body):
@@ -44,10 +45,12 @@ def callback(ch, method, properties, body):
         prev_tick, prev_edge_id = prev_point
         new_tick, edge_id = (payload["tick"], payload["nodeID"])
         if (new_tick > prev_tick):
+            print("edge_id => ", edge_id)
             edge_length = edges.get(edge_id, None)
 
             if (edge_length == None):
                 print("%")
+                raise Exception("QUEBROU")
                 return
 
             velocity_data = {
