@@ -16,6 +16,7 @@ def load_thresholds():
     model = df.rdd.collect()
     for u in model:
         thresholds[int(u["edgeId"])] = [float(u["lower_threshold"]), float(u["upper_threshold"])]
+    print(thresholds)
     return thresholds
 
 def build_kafka_stream(topic):
@@ -33,8 +34,8 @@ def mount_json_extraction(cols):
     return json_objects
 
 
-def mountValue(toId, fromId, edgeId):
-    return json.dumps({"edgeId": edgeId, "fromId": fromId, "toId": toId})
+def mountValue(edgeId):
+    return json.dumps({"edgeId": edgeId})
 
 
 if __name__ == '__main__':
@@ -46,8 +47,12 @@ if __name__ == '__main__':
     json_objects = mount_json_extraction(["edge_id", "avg_speed"])
 
     def checkAnomaly(edge_id, avg_speed):
-        lower, _ = thresholds.get(edge_id)
-        if (avg_speed < lower):
+        bounds = thresholds.get(int(edge_id), None)
+        if (bounds == None):
+            print("Edge não encontrada =>", edge_id)
+            return False
+
+        if (float(avg_speed) < bounds[0]):
             return True
         else:
             return False
@@ -71,6 +76,7 @@ if __name__ == '__main__':
             .start())
 
     (anomaly_detection
+            .filter(col("is_anomaly") == True)
             .writeStream
             .outputMode("append")
             .format("console").option("truncate", False)

@@ -46,11 +46,10 @@ def callback(ch, method, properties, body):
         new_tick, edge_id = (payload["tick"], payload["nodeID"])
         if (new_tick > prev_tick):
             print("edge_id => ", edge_id)
-            edge_length = edges[edge_id]#(edge_id, None)
+            edge_length = edges.get(int(edge_id), None)
 
             if (edge_length == None):
                 print("%")
-                raise Exception("QUEBROU")
                 return
 
             velocity_data = {

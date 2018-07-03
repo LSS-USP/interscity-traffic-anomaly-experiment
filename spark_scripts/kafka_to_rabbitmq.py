@@ -36,12 +36,13 @@ print("Nodes loaded...")
 
 for msg in consumer:
     print("***Anomaly detected***")
+    print(msg)
     payload = msg.value
     anomaly = json.loads(payload)
 
-    fromNodeId = int(anomaly.get("fromId"), None)
-    toNodeId = int(anomaly.get("toId"), None)
-    edgeId = int(anomaly.get("edgeId"))
+    fromNodeId = anomaly.get("fromId")
+    toNodeId = anomaly.get("toId")
+    edgeId = anomaly.get("edgeId")
 
     # easting = float(nodes[fromNodeId][0])
     # northing = float(nodes[fromNodeId][1])
@@ -72,7 +73,7 @@ for msg in consumer:
     #                               routing_key='#',
     #                               body=message)
 
-    print(" [x] Sent %r" % msg)
+    #print(" [x] Sent %r" % msg)
     # except:
     #     raise Exception("""
     #         Your resource_discovery looks weird.
