@@ -24,7 +24,7 @@ def load_nodes(xml_path):
 
 
 def publish_on_platform(node):
-    node_id, x, y = node
+    node_id, lat, lon = node
 
     host = "localhost:8000"
     print("[I] Creating traffic board in node {0}".format(node_id))
@@ -33,8 +33,8 @@ def publish_on_platform(node):
                             "description": node_id,
                             "capabilities": [ "traffic_board" ],
                             "status": "active",
-                            "lat": x,
-                            "lon": y
+                            "lat": lat,
+                            "lon": lon
                          }
                }
 
@@ -43,7 +43,7 @@ def publish_on_platform(node):
     response = requests.post('http://' + host + '/catalog/resources',
                              json=board_json)
     if response.status_code == 404:
-        print("[E] Traffic board at node {0} was not created".format(node_id))
+        print("[E] Traffic board at node {0} was not created".format(node[0]))
     else:
         print("Resource publish'd...")
 
@@ -72,20 +72,20 @@ def from_xy_to_latlon(x, y):
 if __name__ == '__main__':
     if (len(sys.argv) > 1):
         grant_capability_exist()
-        # xml_path = sys.argv[1]
-        # nodes_with_id, nodes_without_id = load_nodes(xml_path)
-        # tree = mount_kd_tree(nodes_without_id)
+        xml_path = sys.argv[1]
+        nodes_with_id, nodes_without_id = load_nodes(xml_path)
+        tree = mount_kd_tree(nodes_without_id)
 
-        node_id = sys.argv[1]
-        x = sys.argv[2]
-        y = sys.argv[3]
-        coords = from_xy_to_latlon(x, y)
-        # url = "https://epsg.io/trans?data={0},{1}&s_srs=4326&t_srs=32719".format(lat, lon)
-        # coords = requests.get(url).json()[0]
-        point = [int(node_id), float(coords[0]), float(coords[1])]
+        lat = sys.argv[2]
+        lon = sys.argv[3]
+        url = "https://epsg.io/trans?data={0},{1}&s_srs=4326&t_srs=32719".format(lat, lon)
+        coords = requests.get(url).json()[0]
+        coords["x"] = float(coords["x"])
+        coords["y"] = float(coords["y"])
+        point = [coords["x"], coords["y"]]
 
-        # rounded_coord = closest_point(tree, point, nodes_with_id)
-        publish_on_platform(point)
+        rounded_coord = closest_point(tree, point, nodes_with_id)
+        publish_on_platform(rounded_coord)
 
     else:
-        raise Exception("Usage: `generate_and_publish_signs.py node_id x y`")
+        raise Exception("Usage: `generate_and_publish_signs.py xml_path lat lon`")
