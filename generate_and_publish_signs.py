@@ -85,7 +85,12 @@ if __name__ == '__main__':
         point = [coords["x"], coords["y"]]
 
         rounded_coord = closest_point(tree, point, nodes_with_id)
-        publish_on_platform(rounded_coord)
+        node_id, x, y = rounded_coord
+        url = "https://epsg.io/trans?data={0},{1}&s_srs=32719&t_srs=4326".format(x, y)
+        coords = requests.get(url).json()[0]
+        coords["x"] = float(coords["x"])
+        coords["y"] = float(coords["y"])
+        publish_on_platform([node_id, coords["y"], coords["x"]])
 
     else:
         raise Exception("Usage: `generate_and_publish_signs.py xml_path lat lon`")
