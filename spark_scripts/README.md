@@ -70,8 +70,12 @@ python3.6 -m pytest  anomaly_detection_test.py
 
 ## Publishing boards
 ```
-python3 generate_and_publish_signs.py 4258014904 2818694.112620861  7206797.441784771
+python3 generate_and_publish_signs.py 1492963064 2819047.8169967565 7207524.748861773
+python3 generate_and_publish_signs.py 28149752 2819667.100838852 7207723.5201618755
 python3 generate_and_publish_signs.py 1819616337 2819912.724556382  7207521.449929407
+python3 generate_and_publish_signs.py 142788951 2818843.058536206 7208116.730843136
+python3 generate_and_publish_signs.py 4258014904 2818694.112620861  7206797.441784771
+python3 generate_and_publish_signs.py  931131905 2817199.9615978533 7206903.68044798
 ```
 
 ## Contact
