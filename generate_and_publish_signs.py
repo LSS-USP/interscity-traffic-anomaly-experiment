@@ -72,25 +72,10 @@ def from_xy_to_latlon(x, y):
 if __name__ == '__main__':
     if (len(sys.argv) > 1):
         grant_capability_exist()
-        xml_path = sys.argv[1]
-        nodes_with_id, nodes_without_id = load_nodes(xml_path)
-        tree = mount_kd_tree(nodes_without_id)
+        _, nodeid, x, y = sys.argv
 
-        lat = sys.argv[2]
-        lon = sys.argv[3]
-        url = "https://epsg.io/trans?data={0},{1}&s_srs=4326&t_srs=32719".format(lat, lon)
-        coords = requests.get(url).json()[0]
-        coords["x"] = float(coords["x"])
-        coords["y"] = float(coords["y"])
-        point = [coords["x"], coords["y"]]
-
-        rounded_coord = closest_point(tree, point, nodes_with_id)
-        node_id, x, y = rounded_coord
-        url = "https://epsg.io/trans?data={0},{1}&s_srs=32719&t_srs=4326".format(x, y)
-        coords = requests.get(url).json()[0]
-        coords["x"] = float(coords["x"])
-        coords["y"] = float(coords["y"])
-        publish_on_platform([node_id, coords["y"], coords["x"]])
+        lat, lon = from_xy_to_latlon(x, y)
+        publish_on_platform([nodeid, lat, lon])
 
     else:
-        raise Exception("Usage: `generate_and_publish_signs.py xml_path lat lon`")
+        raise Exception("Usage: `generate_and_publish_signs.py nodeid x y`")
